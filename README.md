@@ -1,11 +1,107 @@
 # FixdAI — RAG-Powered Bike Repair Assistant
 
-> Ask natural language questions about bike repair and get accurate, source-cited answers powered by real manufacturer documentation.
+> Ask natural language questions about bike repair and get accurate, source-cited answers powered by real Shimano dealer manuals.
 
-![Python](https://img.shields.io/badge/Python-3.11+-blue)
-![LangChain](https://img.shields.io/badge/LangChain-0.2-green)
+![Python](https://img.shields.io/badge/Python-3.13-blue)
+![Next.js](https://img.shields.io/badge/Next.js-14-black)
+![LangChain](https://img.shields.io/badge/LangChain-1.x-green)
 ![ChromaDB](https://img.shields.io/badge/ChromaDB-vector--store-orange)
 ![License](https://img.shields.io/badge/License-MIT-yellow)
+
+---
+
+## Demo
+
+![FixdAI chat interface showing a brake bleeding question with markdown answer and source citations](screenshots/chat-demo.png)
+
+---
+
+## Tech stack
+
+| Layer | Tech |
+|-------|------|
+| Documents | Shimano dealer manuals (PDF) |
+| Embeddings | `all-MiniLM-L6-v2` via ChromaDB (local, no API key needed) |
+| Vector store | ChromaDB — persistent, zero-infra |
+| Orchestration | LangChain |
+| Generation | Claude (Anthropic) |
+| API | FastAPI + uvicorn |
+| Frontend | Next.js 14, Tailwind CSS, react-markdown |
+
+---
+
+## Setup
+
+### Prerequisites
+
+- Python 3.13 (via `uv` — see below)
+- Node.js 18+
+- An [Anthropic API key](https://console.anthropic.com/)
+
+### 1. Clone and set up Python environment
+
+```bash
+git clone https://github.com/AlexDOrban/fixd.git
+cd fixd
+
+# Install uv (fast Python package manager)
+curl -LsSf https://astral.sh/uv/install.sh | sh
+source $HOME/.local/bin/env
+
+# Create venv with Python 3.13 and install dependencies
+uv venv .venv --python 3.13
+uv pip install -r requirements.txt --python .venv/bin/python3
+uv pip install cryptography --python .venv/bin/python3
+```
+
+### 2. Configure environment
+
+```bash
+cp .env.example .env
+# Edit .env and set ANTHROPIC_API_KEY=sk-ant-...
+```
+
+### 3. Add Shimano dealer manuals
+
+Download PDFs from [si.shimano.com](https://si.shimano.com) and place them in `data/docs/`. For example:
+
+- [DM-MADBR01-06-ENG.pdf](https://si.shimano.com/en/pdfs/dm/MADBR01/DM-MADBR01-06-ENG.pdf) — MTB hydraulic disc brakes
+- [DM-RADBR01-11-ENG.pdf](https://si.shimano.com/en/pdfs/dm/RADBR01/DM-RADBR01-11-ENG.pdf) — Road hydraulic disc brakes
+- [DM-GN0001-30-ENG.pdf](https://si.shimano.com/en/pdfs/dm/GN0001/DM-GN0001-30-ENG.pdf) — General operations
+
+> Note: si.shimano.com blocks automated downloads. Download manually in your browser.
+
+### 4. Ingest documents
+
+```bash
+PYTHONPATH=src .venv/bin/python src/ingest.py --reset
+```
+
+### 5. Start the API
+
+```bash
+PYTHONPATH=src .venv/bin/python src/api.py
+# Runs on http://localhost:8000
+```
+
+### 6. Start the frontend
+
+```bash
+cd frontend
+npm install
+npm run dev
+# Opens at http://localhost:3000
+```
+
+---
+
+## CLI usage
+
+```bash
+PYTHONPATH=src .venv/bin/python src/query.py "How do I bleed Shimano hydraulic disc brakes?"
+```
+
+---
 
 ## Architecture
 
@@ -30,91 +126,24 @@
 └─────────────────────────────────────────────────────┘
 ```
 
-## What it demonstrates
-
-- **Document ingestion**: PDF loading, recursive text splitting, metadata enrichment
-- **Embeddings + vector storage**: OpenAI embeddings → ChromaDB (persistent, local)
-- **RAG chain**: LangChain RetrievalQA with source citations
-- **Prompt engineering**: Custom system prompt tuned for bike repair domain
-- **Evaluation**: Test suite with real mechanic questions
-- **API layer**: FastAPI with streaming support
-- **Frontend**: Next.js chat interface with source display
-
-## Quick start
-
-```bash
-# 1. Clone and install
-git clone https://github.com/yourusername/fixdai.git
-cd fixdai
-python -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-
-# 2. Set your API key
-cp .env.example .env
-# Edit .env with your OpenAI key (for embeddings) and Anthropic key (for generation)
-
-# 3. Add PDFs to data/docs/
-# Drop any bike repair manuals, service guides, or tech docs here
-
-# 4. Ingest documents
-python src/ingest.py
-
-# 5. Query
-python src/query.py "How do I bleed Shimano hydraulic disc brakes?"
-
-# 6. Run the API (optional)
-python src/api.py
-```
-
 ## Project structure
 
 ```
-fixdai/
+fixd/
 ├── data/
-│   └── docs/           # Drop PDF manuals here
+│   └── docs/           # PDF manuals (git-ignored)
 ├── src/
-│   ├── ingest.py       # Document loading + chunking + embedding
+│   ├── ingest.py       # Document loading, chunking, embedding
 │   ├── query.py        # CLI query interface
-│   ├── chain.py        # LangChain RAG chain setup
+│   ├── chain.py        # LangChain RAG chain
 │   ├── api.py          # FastAPI wrapper
 │   └── config.py       # Shared configuration
+├── frontend/           # Next.js 14 chat UI
+├── screenshots/        # Demo screenshots
 ├── tests/
-│   └── test_queries.py # Evaluation with real mechanic questions
-├── frontend/           # Next.js chat UI (Day 3-4)
+│   └── test_queries.py
 ├── requirements.txt
-├── .env.example
-└── README.md
-```
-
-## Tech stack
-
-| Layer | Tech | Why |
-|-------|------|-----|
-| Embeddings | OpenAI `text-embedding-3-small` | Best price/performance for retrieval |
-| Vector store | ChromaDB | Zero-infra, persistent, local-first |
-| Orchestration | LangChain | Industry standard, shows framework fluency |
-| Generation | Claude (Anthropic) | Superior instruction following for technical Q&A |
-| API | FastAPI | Async, typed, auto-docs |
-| Frontend | Next.js + React | Matches existing skill stack |
-
-## Example
-
-```
-> How do I adjust rear derailleur cable tension on a Shimano Deore?
-
-FixdAI: To adjust the cable tension on a Shimano Deore rear derailleur:
-
-1. Shift to the smallest cog (highest gear)
-2. Locate the barrel adjuster where the cable enters the derailleur
-3. If shifting to larger cogs is sluggish, turn the barrel adjuster
-   counter-clockwise in half-turn increments
-4. If the chain is slow to drop to smaller cogs, turn clockwise
-5. Test by shifting through the full range
-
-📄 Sources:
-  - Shimano Deore M6100 Dealer Manual, p.14 (chunk 47)
-  - Park Tool: Rear Derailleur Adjustment (chunk 112)
+└── .env.example
 ```
 
 ## License
