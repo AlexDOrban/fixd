@@ -1,101 +1,148 @@
-import Image from "next/image";
+'use client'
 
-export default function Home() {
+import { useState, useRef, useEffect } from 'react'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
+
+type Source = {
+  doc_name: string
+  page: string
+  content: string
+}
+
+type Message = {
+  question: string
+  answer: string
+  sources: Source[]
+}
+
+export default function Page() {
+  const [messages, setMessages] = useState<Message[]>([])
+  const [input, setInput] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const bottomRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [messages])
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!input.trim() || loading) return
+    setLoading(true)
+    setError(null)
+    try {
+      const res = await fetch('http://localhost:8000/query', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ question: input.trim() }),
+      })
+      if (!res.ok) throw new Error(`Server error: ${res.status}`)
+      const data: Message = await res.json()
+      setMessages(prev => [...prev, data])
+      setInput('')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Something went wrong')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  function formatSource(source: Source): string {
+    const name = source.doc_name
+      .replace(/^Dm\s+/i, '')
+      .replace(/\s+Eng$/i, '')
+      .trim()
+    return `${name} · ${source.page}`
+  }
+
   return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="https://nextjs.org/icons/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              app/page.tsx
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
+    <div className="flex flex-col h-screen bg-gray-950 text-white">
+      {/* Title bar */}
+      <header className="flex-none px-4 py-3 bg-gray-900 border-b border-gray-800">
+        <h1 className="text-lg font-semibold tracking-tight"><span aria-hidden="true">🔧 </span>FixdAI</h1>
+      </header>
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="https://nextjs.org/icons/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
-        </div>
+      {/* Message list */}
+      <main className="flex-1 overflow-y-auto px-4 py-6 space-y-6">
+        {messages.length === 0 && (
+          <p className="text-center text-gray-500 mt-16 text-sm">
+            Ask a bike repair question to get started.
+          </p>
+        )}
+        {messages.map((msg, i) => (
+          <div key={i} className="space-y-3">
+            {/* User bubble */}
+            <div className="flex justify-end">
+              <div className="bg-indigo-600 text-white px-4 py-2 rounded-2xl rounded-tr-sm max-w-prose text-sm">
+                {msg.question}
+              </div>
+            </div>
+
+            {/* AI answer */}
+            <div className="bg-gray-800 rounded-2xl rounded-tl-sm px-5 py-4 max-w-prose space-y-3">
+              <div className="prose prose-invert prose-sm max-w-none">
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                  {msg.answer}
+                </ReactMarkdown>
+              </div>
+
+              {/* Source pills */}
+              {msg.sources.length > 0 && (
+                <div className="flex flex-wrap gap-2 pt-2 border-t border-gray-700">
+                  {msg.sources.map((src, j) => (
+                    <span
+                      key={j}
+                      className="inline-flex items-center gap-1 bg-gray-700 text-gray-300 text-xs px-2.5 py-1 rounded-full"
+                      title={src.content}
+                    >
+                      📄 {formatSource(src)}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        ))}
+        <div ref={bottomRef} />
       </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
+
+      {/* Input bar */}
+      <footer className="flex-none px-4 py-3 bg-gray-900 border-t border-gray-800">
+        {error && (
+          <div className="mb-2 text-sm text-red-400 bg-red-950 border border-red-800 rounded-lg px-3 py-2 flex justify-between">
+            <span>{error}</span>
+            <button onClick={() => setError(null)} className="ml-2 text-red-300 hover:text-white">✕</button>
+          </div>
+        )}
+        <form onSubmit={handleSubmit} className="flex gap-2">
+          <textarea
+            className="flex-1 resize-none bg-gray-800 text-white placeholder-gray-500 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 max-h-24"
+            rows={1}
+            placeholder="Ask a bike repair question..."
+            value={input}
+            onChange={e => setInput(e.target.value)}
+            onKeyDown={e => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault()
+                handleSubmit(e as unknown as React.FormEvent)
+              }
+            }}
+            disabled={loading}
           />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
+          <button
+            type="submit"
+            disabled={!input.trim() || loading}
+            className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed text-white px-4 py-2 rounded-xl text-sm font-medium transition-colors"
+            aria-label="Send"
+          >
+            {loading ? (
+              <span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+            ) : '→'}
+          </button>
+        </form>
       </footer>
     </div>
-  );
+  )
 }
