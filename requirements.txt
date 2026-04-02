@@ -1,0 +1,29 @@
+# Core RAG pipeline
+langchain>=0.2.0
+langchain-community>=0.2.0
+langchain-openai>=0.1.0
+langchain-anthropic>=0.1.0
+langchain-chroma>=0.1.0
+
+# Vector store
+chromadb>=0.5.0
+
+# Document loading
+pypdf>=4.0.0
+unstructured>=0.14.0
+
+# Embeddings
+openai>=1.30.0
+
+# LLM
+anthropic>=0.30.0
+
+# API layer
+fastapi>=0.111.0
+uvicorn>=0.30.0
+pydantic>=2.7.0
+
+# Utilities
+python-dotenv>=1.0.0
+rich>=13.7.0
+tiktoken>=0.7.0
